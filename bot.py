@@ -20,17 +20,29 @@ API_URL = os.getenv("API_URL")  # 如 "https://your-backend-api.com"
 
 # --- Command: /start ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🎲 欢迎来到H5游戏！请输入 /bind 开始绑定手机号。")
+    user = update.effective_user
+    inviter_id = int(context.args[0]) if context.args else None
 
-# --- Command: /bind ---
-async def bind(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 检查是否为私聊
-    if update.message.chat.type != "private":
-        await update.message.reply_text("请点击我头像私聊，输入 /bind 绑定手机号。")
-        return
-    contact_button = KeyboardButton("📱 发送手机号", request_contact=True)
-    markup = ReplyKeyboardMarkup([[contact_button]], resize_keyboard=True, one_time_keyboard=True)
-    await update.message.reply_text("请点击下方按钮发送手机号完成绑定", reply_markup=markup)
+    # 防止自己邀请自己
+    if inviter_id == user.id:
+        inviter_id = None
+
+    with get_conn() as conn, conn.cursor() as c:
+        c.execute("SELECT 1 FROM users WHERE user_id = %s", (user.id,))
+        if not c.fetchone():
+            now = datetime.now().isoformat()
+            c.execute("""
+                INSERT INTO users (user_id, first_name, last_name, username, plays, points, created_at, invited_by)
+                VALUES (%s, %s, %s, %s, 0, 0, %s, %s)
+            """, (user.id, user.first_name, user.last_name, user.username, now, inviter_id))
+            conn.commit()
+
+    keyboard = ReplyKeyboardMarkup(
+        [[KeyboardButton("📱 分享手机号", request_contact=True)]],
+        resize_keyboard=True, one_time_keyboard=True
+    )
+    await update.message.reply_text("⚠️ 为参与群组游戏，请先授权手机号：", reply_markup=keyboard)
+    await update.message.reply_text("ℹ️ 想了解游戏玩法，请发送 /help 查看详细说明。")
 
 # --- Contact Handler ---
 async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
