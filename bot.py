@@ -24,6 +24,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- Command: /bind ---
 async def bind(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # 检查是否为私聊
+    if update.message.chat.type != "private":
+        await update.message.reply_text("请点击我头像私聊，输入 /bind 绑定手机号。")
+        return
     contact_button = KeyboardButton("📱 发送手机号", request_contact=True)
     markup = ReplyKeyboardMarkup([[contact_button]], resize_keyboard=True, one_time_keyboard=True)
     await update.message.reply_text("请点击下方按钮发送手机号完成绑定", reply_markup=markup)
