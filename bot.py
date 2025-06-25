@@ -1,41 +1,49 @@
-import os, nest_asyncio, asyncio
-import psycopg2
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+# bot.py
+
+import os
 from dotenv import load_dotenv
+import asyncio
+from psycopg2.pool import SimpleConnectionPool
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
+# 1. 环境变量
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-app = Flask(__name__)
-CORS(app)
+# 2. 数据库连接池
+db_pool = SimpleConnectionPool(minconn=1, maxconn=5, dsn=DATABASE_URL)
 
 def get_conn():
-    return psycopg2.connect(DATABASE_URL)
-def init_db():
-    with get_conn() as conn, conn.cursor() as c:
-        with open('schema.sql', encoding='utf-8') as f:
-            c.execute(f.read())
-        conn.commit()
+    return db_pool.getconn()
 
-# Telegram Bot
+def put_conn(conn):
+    db_pool.putconn(conn)
+
+# 3. /start 指令
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    with get_conn() as conn, conn.cursor() as c:
-        c.execute("INSERT INTO users (user_id, username, created_at) VALUES (%s, %s, NOW()) ON CONFLICT DO NOTHING", (user.id, user.username))
+    conn = get_conn()
+    try:
+        with conn.cursor() as c:
+            c.execute(
+                "INSERT INTO users (user_id, username, created_at) VALUES (%s, %s, NOW()) ON CONFLICT (user_id) DO NOTHING",
+                (user.id, user.username)
+            )
         conn.commit()
+    except Exception:
+        await update.message.reply_text("数据库错误，请稍后再试。")
+        return
+    finally:
+        put_conn(conn)
     await update.message.reply_text(f"欢迎，{user.first_name}！")
 
-def run_bot():
-    application = Application.builder().token(BOT_TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-    application.run_polling()
+# 4. 启动 Bot
+def main():
+    app = Application.builder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.run_polling()
 
-if __name__ == '__main__':
-    nest_asyncio.apply()
-    loop = asyncio.get_event_loop()
-    loop.create_task(asyncio.to_thread(run_bot))
-    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 8080)))
+if __name__ == "__main__":
+    main()
