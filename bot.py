@@ -9,6 +9,8 @@ from telegram import (
     Update,
     KeyboardButton,
     ReplyKeyboardMarkup,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup，
 )
 from telegram.ext import (
     ApplicationBuilder,
@@ -107,15 +109,27 @@ async def show_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text, parse_mode="HTML")
 
+async def game(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🎮 点击开始游戏", callback_game={"game_short_name": "test_game"})]
+    ])
+    await update.message.reply_game(game_short_name="test_game", reply_markup=keyboard)
 
+async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.callback_query.game_short_name == "test_game":
+        await update.callback_query.answer(url="https://yourdomain.com/game/game.html")
+    else:
+        await update.callback_query.answer(text="找不到这个游戏", show_alert=True)
+        
 # --- Entry Point ---
 async def main():
     application = ApplicationBuilder().token(BOT_TOKEN).build()
-
+    application.add_handler(CommandHandler("game", game))
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("bind", bind))
     application.add_handler(MessageHandler(filters.CONTACT, contact_handler))
     application.add_handler(CommandHandler("rank", show_rank))
+    application.add_handler(MessageHandler(filters.UpdateType.CALLBACK_QUERY, callback_query_handler))
 
     await application.run_polling()
 
