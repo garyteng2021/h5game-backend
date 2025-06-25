@@ -90,12 +90,12 @@
             <td>{{ '✅' if u[11] else '❌' }}</td>
             <td>
               <select id="block-{{ u[0] }}" class="form-select form-select-sm">
-                <option value="0" {% if not u[12] %}selected{% endif %}>否</option>
-                <option value="1" {% if u[12] %}selected{% endif %}>是</option>
+                <option value="0" {% if not u[10] %}selected{% endif %}>否</option>
+                <option value="1" {% if u[10] %}selected{% endif %}>是</option>
               </select>
             </td>
-            <td>{{ u[8].strftime('%Y-%m-%d %H:%M:%S') if u[8] else '—' }}</td>
-            <td>{{ u[9].strftime('%Y-%m-%d %H:%M:%S') if u[9] else '—' }}</td>
+            <td>{{ u[6].strftime('%Y-%m-%d %H:%M:%S') if u[6] else '—' }}</td>
+            <td>{{ u[7].strftime('%Y-%m-%d %H:%M:%S') if u[7] else '—' }}</td>
             <td>
               <button class="btn btn-sm btn-success mb-1" onclick="updateUser('{{ u[0] }}')">保存</button>
               <button class="btn btn-sm btn-danger" onclick="deleteUser('{{ u[0] }}')">删除</button>
