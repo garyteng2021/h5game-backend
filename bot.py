@@ -10,35 +10,35 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+API_URL = os.getenv("API_URL")
 
-def start(update, context):
-    update.message.reply_text("🎲 欢迎来到H5游戏！请输入 /bind 开始绑定手机号。")
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🎲 欢迎来到H5游戏！请输入 /bind 开始绑定手机号。")
 
-def bind(update, context):
+async def bind(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.chat.type != "private":
-        bot_name = context.bot.username
-        update.message.reply_text(
+        bot_name = (await context.bot.get_me()).username
+        await update.message.reply_text(
             f"请点击这里私聊我绑定手机号：https://t.me/{bot_name}"
         )
         return
     contact_button = KeyboardButton("📱 发送手机号", request_contact=True)
     markup = ReplyKeyboardMarkup([[contact_button]], resize_keyboard=True, one_time_keyboard=True)
-    update.message.reply_text("请点击下方按钮发送手机号完成绑定", reply_markup=markup)
+    await update.message.reply_text("请点击下方按钮发送手机号完成绑定", reply_markup=markup)
 
-# contact handler
 async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     contact = update.message.contact
     user_id = update.message.from_user.id
     phone = contact.phone_number
     username = update.message.from_user.username
 
-    # 请求后端API进行绑定
     payload = {
         "user_id": user_id,
         "username": username,
         "phone": phone,
     }
     try:
+        import requests
         resp = requests.post(f"{API_URL}/api/user/bind", json=payload, timeout=5)
         resp.raise_for_status()
         data = resp.json()
@@ -60,7 +60,7 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("bind", bind))
     application.add_handler(MessageHandler(filters.CONTACT, contact_handler))
-    application.run_polling()  # <-- 不要 await，也不用 async main
+    application.run_polling()
 
 if __name__ == "__main__":
     main()
