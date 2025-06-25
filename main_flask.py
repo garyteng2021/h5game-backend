@@ -308,7 +308,6 @@ def index():
     return redirect(url_for('dashboard'))
 
 if __name__ == '__main__':
-    init_db()
     scheduler = BackgroundScheduler()
     scheduler.add_job(daily_token_job, "cron", hour=0, minute=0)
     scheduler.start()
