@@ -94,8 +94,8 @@
                 <option value="1" {% if u[12] %}selected{% endif %}>是</option>
               </select>
             </td>
-            <td>{{ u[8][:19].replace('T',' ') if u[8] else '—' }}</td>
-            <td>{{ u[9][:19].replace('T',' ') if u[9] else '—' }}</td>
+            <td>{{ u[8].strftime('%Y-%m-%d %H:%M:%S') if u[8] else '—' }}</td>
+            <td>{{ u[9].strftime('%Y-%m-%d %H:%M:%S') if u[9] else '—' }}</td>
             <td>
               <button class="btn btn-sm btn-success mb-1" onclick="updateUser('{{ u[0] }}')">保存</button>
               <button class="btn btn-sm btn-danger" onclick="deleteUser('{{ u[0] }}')">删除</button>
