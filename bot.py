@@ -18,6 +18,9 @@ logging.basicConfig(level=logging.INFO)
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 API_URL = os.getenv("API_URL")  # 如 "https://your-backend-api.com"
 
+def get_conn():
+    return psycopg2.connect(DATABASE_URL)
+
 # --- Command: /start ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
