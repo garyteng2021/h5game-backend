@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>H5测试游戏</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
   <style>
     body { text-align: center; padding: 50px; font-family: sans-serif; background: #f2f2f2; }
@@ -20,7 +21,15 @@
   <div id="result"></div>
 
   <script>
-    const userId = "6040142759"; // 请替换成您的用户ID
+    window.Telegram.WebApp.ready();
+    const tgUser = Telegram.WebApp.initDataUnsafe.user;
+
+    let userId = null;
+    if (tgUser && tgUser.id) {
+      userId = tgUser.id;
+    } else {
+      alert("⚠️ 请从 Telegram 中打开游戏链接");
+    }
 
     function refreshData(data){
       $('#points').text(data.points);
@@ -29,6 +38,10 @@
     }
 
     $('#playBtn').on('click', function(){
+      if (!userId) {
+        alert("用户信息获取失败！");
+        return;
+      }
       $.post('/play', { user_id: userId }, function(data){
         refreshData(data);
       }).fail(res => {
