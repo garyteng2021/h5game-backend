@@ -44,7 +44,7 @@ def admin_dashboard():
 
     # 用户信息
     cur.execute("""
-        SELECT u.user_id, u.username, u.first_name, u.username, u.phone, u.points, u.token, u.plays,
+        SELECT u.user_id, u.username, u.phone, u.points, u.token, u.plays,
                u.created_at, u.last_play, u.invite_count, ir.reward_given, u.is_blocked, u.invited_by
         FROM users u
         LEFT JOIN invite_rewards ir ON ir.invitee = u.user_id
