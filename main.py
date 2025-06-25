@@ -247,4 +247,4 @@ if __name__ == '__main__':
     scheduler.add_job(daily_token_job, "cron", hour=0, minute=0)
     scheduler.start()
     Thread(target=start_bot, daemon=True).start()
-    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 8080)))
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
