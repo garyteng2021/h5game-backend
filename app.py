@@ -16,7 +16,6 @@ def admin_dashboard():
     conn = get_conn()
     cur = conn.cursor()
 
-    # 数据统计
     cur.execute("SELECT COUNT(*) FROM users")
     total_users = cur.fetchone()[0]
     cur.execute("SELECT COUNT(*) FROM users WHERE phone IS NOT NULL")
@@ -26,11 +25,9 @@ def admin_dashboard():
     cur.execute("SELECT SUM(points) FROM users")
     total_points = cur.fetchone()[0] or 0
 
-    # 总积分排行榜
     cur.execute("SELECT username, phone, points FROM users ORDER BY points DESC LIMIT 10")
     total_rank = cur.fetchall()
 
-    # 今日排行榜
     cur.execute("""
         SELECT u.username, u.phone, SUM(g.points_change) as score 
         FROM game_history g
@@ -42,7 +39,6 @@ def admin_dashboard():
     """)
     today_rank = cur.fetchall()
 
-    # 用户信息
     cur.execute("""
         SELECT u.user_id, u.username, u.first_name, u.username, u.phone, u.points, u.token, u.plays,
                u.created_at, u.last_play, u.invite_count, ir.reward_given, u.is_blocked, u.invited_by
