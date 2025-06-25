@@ -4,17 +4,9 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
-from threading import Thread
-
-# Telegram Bot
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    ApplicationBuilder, CommandHandler, ContextTypes
-)
 
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 app = Flask(__name__)
 CORS(app)
@@ -27,8 +19,6 @@ def init_db():
         with open('schema.sql', encoding='utf-8') as f:
             c.execute(f.read())
         conn.commit()
-
-# ---- Flask RESTful API ----
 
 @app.route('/api/register', methods=['POST'])
 def register():
@@ -204,47 +194,9 @@ def daily_token_job():
         c.execute("UPDATE users SET token = LEAST(token + 3, 10)")
         conn.commit()
 
-# --- Telegram Bot核心逻辑 ---
-from telegram.ext import ApplicationBuilder
-
-async def tg_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    # 注册到数据库
-    with get_conn() as conn, conn.cursor() as c:
-        c.execute("""
-            INSERT INTO users (user_id, username, created_at)
-            VALUES (%s, %s, NOW())
-            ON CONFLICT (user_id) DO NOTHING
-        """, (user.id, user.username))
-        conn.commit()
-    # 发送H5游戏链接
-    h5_url = f"https://yourgame.com/?user_id={user.id}"
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🚀 进入H5游戏", url=h5_url)]
-    ])
-    await update.message.reply_text(
-        "欢迎！请点击下方按钮开始H5游戏～",
-        reply_markup=keyboard
-    )
-
-async def tg_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    with get_conn() as conn, conn.cursor() as c:
-        c.execute("SELECT points, token FROM users WHERE user_id=%s", (user.id,))
-        row = c.fetchone()
-    msg = "积分：%d\nToken：%d" % (row[0], row[1]) if row else "未找到你的账号。"
-    await update.message.reply_text(msg)
-
-def start_bot():
-    app_bot = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
-    app_bot.add_handler(CommandHandler("start", tg_start))
-    app_bot.add_handler(CommandHandler("profile", tg_profile))
-    app_bot.run_polling()
-
 if __name__ == '__main__':
     init_db()
     scheduler = BackgroundScheduler()
     scheduler.add_job(daily_token_job, "cron", hour=0, minute=0)
     scheduler.start()
-    Thread(target=start_bot, daemon=True).start()
-    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 8080)))
