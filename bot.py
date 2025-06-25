@@ -18,6 +18,7 @@ from telegram.ext import (
     MessageHandler,
     ContextTypes,
     filters,
+    CallbackQueryHandler,
 )
 
 nest_asyncio.apply()
@@ -129,7 +130,7 @@ async def main():
     application.add_handler(CommandHandler("bind", bind))
     application.add_handler(MessageHandler(filters.CONTACT, contact_handler))
     application.add_handler(CommandHandler("rank", show_rank))
-    application.add_handler(MessageHandler(filters.UpdateType.CALLBACK_QUERY, callback_query_handler))
+    application.add_handler(CallbackQueryHandler(callback_query_handler))
 
     await application.run_polling()
 
