@@ -1,35 +1,28 @@
 import os
-import requests
 import logging
 from dotenv import load_dotenv
-from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
-    ContextTypes, filters
+    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 )
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-API_URL = os.getenv("API_URL")  # 如 https://your-backend-api.com
 
-# /start
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🎲 欢迎来到H5游戏！请输入 /bind 开始绑定手机号。")
+def start(update, context):
+    update.message.reply_text("🎲 欢迎来到H5游戏！请输入 /bind 开始绑定手机号。")
 
-# /bind
-async def bind(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 只允许私聊绑定
+def bind(update, context):
     if update.message.chat.type != "private":
-        bot_name = (await context.bot.get_me()).username
-        await update.message.reply_text(
+        bot_name = context.bot.username
+        update.message.reply_text(
             f"请点击这里私聊我绑定手机号：https://t.me/{bot_name}"
         )
         return
     contact_button = KeyboardButton("📱 发送手机号", request_contact=True)
     markup = ReplyKeyboardMarkup([[contact_button]], resize_keyboard=True, one_time_keyboard=True)
-    await update.message.reply_text("请点击下方按钮发送手机号完成绑定", reply_markup=markup)
+    update.message.reply_text("请点击下方按钮发送手机号完成绑定", reply_markup=markup)
 
 # contact handler
 async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -61,13 +54,12 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         disable_web_page_preview=True
     )
 
-async def main():
+def main():
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("bind", bind))
     application.add_handler(MessageHandler(filters.CONTACT, contact_handler))
-    await application.run_polling()
+    application.run_polling()  # <-- 不要 await，也不用 async main
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    main()
