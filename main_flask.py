@@ -1,6 +1,6 @@
 import os
 import psycopg2
-from flask import Flask, request, jsonify
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 from flask_cors import CORS
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
@@ -193,6 +193,110 @@ def daily_token_job():
     with get_conn() as conn, conn.cursor() as c:
         c.execute("UPDATE users SET token = LEAST(token + 3, 10)")
         conn.commit()
+
+@app.route('/dashboard')
+def dashboard():
+    # 统计信息
+    with get_conn() as conn, conn.cursor() as c:
+        c.execute("SELECT COUNT(*) FROM users")
+        total_users = c.fetchone()[0]
+        c.execute("SELECT COUNT(*) FROM users WHERE phone IS NOT NULL AND phone != ''")
+        authorized_users = c.fetchone()[0]
+        c.execute("SELECT COUNT(*) FROM users WHERE is_blocked=1")
+        blocked_users = c.fetchone()[0]
+        c.execute("SELECT SUM(points) FROM users")
+        total_points = c.fetchone()[0] or 0
+
+        # 总积分排行榜
+        c.execute("SELECT username, phone, points FROM users ORDER BY points DESC LIMIT 10")
+        total_rank = c.fetchall()
+
+        # 今日积分排行榜
+        c.execute("""
+            SELECT u.username, u.phone, SUM(g.points_change) as today_points
+            FROM users u
+            JOIN game_history g ON u.user_id = g.user_id
+            WHERE g.created_at::date = CURRENT_DATE
+            GROUP BY u.username, u.phone
+            ORDER BY today_points DESC
+            LIMIT 10
+        """)
+        today_rank = c.fetchall()
+
+        # 用户数据表（可根据你的表结构微调字段顺序）
+        c.execute("""
+            SELECT user_id, username, phone, username, phone, points, token, plays, created_at, last_play, invite_count, 0, is_blocked, invited_by
+            FROM users
+            ORDER BY user_id DESC
+            LIMIT 100
+        """)
+        users = c.fetchall()
+    stats = {
+        "total_users": total_users,
+        "authorized_users": authorized_users,
+        "blocked_users": blocked_users,
+        "total_points": total_points
+    }
+    return render_template(
+        'dashboard.html',
+        stats=stats,
+        total_rank=total_rank,
+        today_rank=today_rank,
+        users=users
+    )
+
+@app.route('/game_history')
+def game_history():
+    user_id = request.args.get('user_id')
+    page = int(request.args.get('page', 1))
+    per_page = 20
+    offset = (page - 1) * per_page
+
+    with get_conn() as conn, conn.cursor() as c:
+        if user_id:
+            c.execute("SELECT COUNT(*) FROM game_history WHERE user_id=%s", (user_id,))
+            total = c.fetchone()[0]
+            c.execute("""
+                SELECT user_id, created_at, game_type, level, user_score, points_change, token_change, result, remark
+                FROM game_history WHERE user_id=%s
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s
+            """, (user_id, per_page, offset))
+        else:
+            c.execute("SELECT COUNT(*) FROM game_history")
+            total = c.fetchone()[0]
+            c.execute("""
+                SELECT user_id, created_at, game_type, level, user_score, points_change, token_change, result, remark
+                FROM game_history
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s
+            """, (per_page, offset))
+        records = [
+            {
+                "user_id": r[0],
+                "created_at": r[1].strftime('%Y-%m-%d %H:%M:%S'),
+                "game_type": r[2],
+                "level": r[3],
+                "user_score": r[4],
+                "points_change": r[5],
+                "token_change": r[6],
+                "result": r[7],
+                "remark": r[8],
+            } for r in c.fetchall()
+        ]
+        total_pages = max(1, (total + per_page - 1) // per_page)
+    return render_template(
+        'game_history.html',
+        records=records,
+        user_id=user_id,
+        page=page,
+        total_pages=total_pages
+    )
+
+# 如果需要首页跳转到 dashboard
+@app.route('/')
+def index():
+    return redirect(url_for('dashboard'))
 
 if __name__ == '__main__':
     init_db()
