@@ -88,6 +88,56 @@ def delete_user():
     conn.close()
     return "ok"
 
+@app.route("/play", methods=["POST"])
+def play_game():
+    user_id = request.form.get("user_id")
+    if not user_id:
+        return jsonify({"error": "Missing user_id"}), 400
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("SELECT token, points, plays FROM users WHERE user_id=%s", (user_id,))
+    row = cur.fetchone()
+    if not row:
+        return jsonify({"error": "User not found"}), 404
+
+    token, points, plays = row
+    if token <= 0:
+        return jsonify({"error": "No tokens left"}), 403
+
+    # 模拟游戏
+    import random
+    score = random.randint(1, 10)
+    points += score
+    token -= 1
+    plays += 1
+
+    # 更新用户积分
+    cur.execute("""
+        UPDATE users 
+        SET points=%s, token=%s, plays=%s, last_play=NOW()
+        WHERE user_id=%s
+    """, (points, token, plays, user_id))
+
+    # 插入历史
+    cur.execute("""
+        INSERT INTO game_history (user_id, user_score, points_change, token_change, game_type, level, result, remark)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+    """, (user_id, score, score, -1, 'demo', 1, 'win' if score >= 5 else 'lose', '测试H5小游戏'))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return jsonify({
+        "score": score,
+        "points": points,
+        "token": token,
+        "plays": plays,
+        "result": "win" if score >= 5 else "lose"
+    })
+
 @app.route("/api/game_history")
 def game_history():
     user_id = request.args.get("user_id")
