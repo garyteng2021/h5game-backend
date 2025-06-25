@@ -1,136 +1,124 @@
 import os
+import random
+import psycopg2
 import asyncio
-import asyncpg
-from aiogram import Bot, Dispatcher, types
-from aiogram.enums import ParseMode
-from aiogram.filters import Command
+import logging
+import nest_asyncio
+from dotenv import load_dotenv
+from telegram import (
+    Update,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+)
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
 
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN") or "你的BotToken"
-DATABASE_URL = os.getenv("DATABASE_URL") or "你的Postgres链接"
+nest_asyncio.apply()
+load_dotenv()
+logging.basicConfig(level=logging.INFO)
 
-bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
-dp = Dispatcher(bot)
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-# 全局数据库连接池
-db_pool = None
+# --- DB Helper ---
+def get_conn():
+    return psycopg2.connect(DATABASE_URL)
 
-async def get_db():
-    global db_pool
-    if db_pool is None:
-        db_pool = await asyncpg.create_pool(DATABASE_URL)
-    return db_pool
 
-# 用户注册/查找
-async def register_user(user_id, username, invited_by=None):
-    pool = await get_db()
-    async with pool.acquire() as conn:
-        exists = await conn.fetchval("SELECT 1 FROM users WHERE user_id=$1", user_id)
-        if not exists:
-            await conn.execute(
-                "INSERT INTO users(user_id, username, invited_by, token) VALUES ($1, $2, $3, $4)",
-                user_id, username, invited_by, 5  # 注册奖励5Token
-            )
-            if invited_by:
-                # 只奖励一次
-                already_rewarded = await conn.fetchval(
-                    "SELECT 1 FROM invite_rewards WHERE inviter=$1 AND invitee=$2",
-                    invited_by, user_id
-                )
-                if not already_rewarded:
-                    await conn.execute(
-                        "UPDATE users SET token = token + 2, invite_count = invite_count + 1 WHERE user_id=$1",
-                        invited_by
-                    )
-                    await conn.execute(
-                        "INSERT INTO invite_rewards(inviter, invitee, reward_given) VALUES ($1, $2, $3)",
-                        invited_by, user_id, True
-                    )
-            return True
-        return False
+# --- /start 注册用户 ---
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    user_id = user.id
+    username = user.username or ""
+    args = context.args
+    invited_by = int(args[0]) if args else None
 
-# 查询积分/Token
-async def get_user_info(user_id):
-    pool = await get_db()
-    async with pool.acquire() as conn:
-        return await conn.fetchrow(
-            "SELECT token, points, invited_by FROM users WHERE user_id=$1", user_id
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT 1 FROM users WHERE user_id=%s", (user_id,))
+    exists = cur.fetchone()
+
+    if not exists:
+        cur.execute(
+            "INSERT INTO users(user_id, username, invited_by, token) VALUES (%s, %s, %s, %s)",
+            (user_id, username, invited_by, 5),
         )
 
-# 查询排行榜
-async def get_leaderboard(limit=10):
-    pool = await get_db()
-    async with pool.acquire() as conn:
-        return await conn.fetch(
-            "SELECT username, points FROM users ORDER BY points DESC LIMIT $1", limit
-        )
+        if invited_by:
+            cur.execute("SELECT 1 FROM invite_rewards WHERE inviter=%s AND invitee=%s", (invited_by, user_id))
+            if not cur.fetchone():
+                cur.execute("UPDATE users SET token = token + 2, invite_count = invite_count + 1 WHERE user_id=%s", (invited_by,))
+                cur.execute("INSERT INTO invite_rewards (inviter, invitee, reward_given) VALUES (%s, %s, %s)", (invited_by, user_id, True))
 
-@dp.message_handler(commands=['start'])
-async def cmd_start(message: types.Message):
-    # 检查是否带邀请参数
-    args = message.get_args()
-    invited_by = int(args) if args.isdigit() else None
-    user = message.from_user
-    is_new = await register_user(user.id, user.username, invited_by)
-    text = f"👋 欢迎{'新用户' if is_new else '回来'}，<b>{user.first_name}</b>！\n\n"
-    text += "🎮 <b>Bot积分体系已开启！</b>\n\n"
-    if is_new and invited_by:
-        text += "你通过邀请链接注册，已获得注册奖励，邀请人也已获得奖励。\n"
-    text += "\n输入 /me 查询积分，/invite 获取你的专属邀请链接。\n"
-    await message.answer(text)
+        conn.commit()
 
-@dp.message_handler(commands=['me'])
-async def cmd_me(message: types.Message):
-    user_id = message.from_user.id
-    info = await get_user_info(user_id)
-    if info:
-        text = f"👤 <b>你的数据</b>\n"
-        text += f"Token：{info['tokens']}\n"
-        text += f"积分：{info['points']}\n"
-        text += f"邀请人：{'无' if not info['invited_by'] else info['invited_by']}\n"
-        await message.answer(text)
-    else:
-        await message.answer("未查到你的数据，请先 /start 注册。")
+    cur.close()
+    conn.close()
 
-@dp.message_handler(commands=['invite'])
-async def cmd_invite(message: types.Message):
-    user_id = message.from_user.id
-    link = f"https://t.me/{(await bot.me).username}?start={user_id}"
-    await message.answer(
-        f"🔗 <b>你的邀请链接：</b>\n{link}\n\n"
-        "每邀请1人注册，你与对方都能获得奖励Token！"
-    )
+    text = f"👋 欢迎 {user.first_name}！\n"
+    text += "你已成功进入积分系统。\n\n"
+    text += "发送 /bind 可绑定手机号。\n"
+    text += "发送 /rank 可查看排行榜。\n"
+    text += "发送 /start [邀请ID] 可邀请好友注册。"
 
-@dp.message_handler(commands=['leaderboard'])
-async def cmd_leaderboard(message: types.Message):
-    board = await get_leaderboard()
-    text = "<b>🏆 排行榜（前10名）</b>\n"
-    for i, row in enumerate(board, 1):
-        text += f"{i}. {row['username'] or '无名'} - {row['points']} 分\n"
-    await message.answer(text)
+    await update.message.reply_text(text)
 
-@dp.message_handler(commands=['push'])
-async def cmd_push(message: types.Message):
-    if message.from_user.id != ADMIN_ID:
-        return
-    # /push 你的内容
-    content = message.get_args()
-    if not content:
-        await message.reply("请在命令后加内容：/push 消息内容")
-        return
-    # 群发给所有用户
-    pool = await get_db()
-    async with pool.acquire() as conn:
-        users = await conn.fetch("SELECT user_id FROM users")
-        for user in users:
-            try:
-                await bot.send_message(user['user_id'], f"📢 <b>公告：</b>{content}")
-                await asyncio.sleep(0.05)  # 防封号
-            except Exception:
-                continue
-        await message.reply("已推送。")
 
+# --- /bind 获取手机号 ---
+async def bind(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    button = KeyboardButton("点击发送手机号 📱", request_contact=True)
+    markup = ReplyKeyboardMarkup([[button]], resize_keyboard=True)
+    await update.message.reply_text("请点击下面按钮发送你的手机号：", reply_markup=markup)
+
+
+# --- 接收手机号 ---
+async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    contact = update.message.contact
+    user_id = update.effective_user.id
+    phone = contact.phone_number
+
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET phone=%s WHERE user_id=%s", (phone, user_id))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    await update.message.reply_text(f"✅ 已绑定手机号：{phone}")
+
+
+# --- /rank 查看排行榜 ---
+async def show_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT username, points FROM users ORDER BY points DESC LIMIT 10")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    text = "<b>🏆 当前排行榜前10名：</b>\n"
+    for i, row in enumerate(rows, 1):
+        text += f"{i}. {row[0] or '无名'} - {row[1]} 分\n"
+
+    await update.message.reply_text(text, parse_mode="HTML")
+
+
+# --- Entry Point ---
 async def main():
-    await dp.start_polling(bot)
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("bind", bind))
+    application.add_handler(MessageHandler(filters.CONTACT, contact_handler))
+    application.add_handler(CommandHandler("rank", show_rank))
+
+    await application.run_polling()
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.get_event_loop().run_until_complete(main())
