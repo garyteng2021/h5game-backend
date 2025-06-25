@@ -117,7 +117,7 @@ async def game(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.callback_query.game_short_name == "test_game":
-        await update.callback_query.answer(url="https://yourdomain.com/game/game.html")
+        await update.callback_query.answer(url="https://h5game-backend-production.up.railway.app/game/game.html")
     else:
         await update.callback_query.answer(text="找不到这个游戏", show_alert=True)
         
