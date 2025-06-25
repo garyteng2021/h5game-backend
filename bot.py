@@ -2,8 +2,8 @@ import os
 import asyncio
 import asyncpg
 from aiogram import Bot, Dispatcher, types
-from aiogram.utils import executor
-from aiogram.types import ParseMode
+from aiogram.enums import ParseMode
+from aiogram.filters import Command
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN") or "你的BotToken"
 DATABASE_URL = os.getenv("DATABASE_URL") or "你的Postgres链接"
@@ -19,26 +19,6 @@ async def get_db():
     if db_pool is None:
         db_pool = await asyncpg.create_pool(DATABASE_URL)
     return db_pool
-
-# 数据库初始化函数（首次部署可调用一次）
-async def init_db():
-    pool = await get_db()
-    async with pool.acquire() as conn:
-        await conn.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            user_id BIGINT PRIMARY KEY,
-            username TEXT,
-            invited_by BIGINT,
-            tokens INT DEFAULT 0,
-            points INT DEFAULT 0,
-            created_at TIMESTAMP DEFAULT NOW()
-        );
-        CREATE TABLE IF NOT EXISTS invites (
-            user_id BIGINT,
-            invited_id BIGINT,
-            invite_time TIMESTAMP DEFAULT NOW()
-        );
-        """)
 
 # 用户注册/查找
 async def register_user(user_id, username, invited_by=None):
@@ -128,9 +108,6 @@ async def cmd_leaderboard(message: types.Message):
         text += f"{i}. {row['username'] or '无名'} - {row['points']} 分\n"
     await message.answer(text)
 
-# 管理员推送示例（只允许某管理员ID推送）
-ADMIN_ID = 123456789
-
 @dp.message_handler(commands=['push'])
 async def cmd_push(message: types.Message):
     if message.from_user.id != ADMIN_ID:
@@ -152,7 +129,8 @@ async def cmd_push(message: types.Message):
                 continue
         await message.reply("已推送。")
 
+async def main():
+    await dp.start_polling(bot)
+
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(init_db())
-    executor.start_polling(dp, skip_updates=True)
+    asyncio.run(main())
