@@ -81,11 +81,11 @@
           {% for u in users %}
           <tr class="{{ 'table-danger' if u[12] == 1 else '' }}">
             <td>{{ u[0] }}</td>
-            <td>{{ u[3] or u[1] or u[2] or '无名氏' }}</td>
-            <td>{{ u[4] if u[4] else '未授权' }}</td>
-            <td><input type="number" class="form-control form-control-sm" value="{{ u[5] or 0 }}" id="points-{{ u[0] }}"></td>
-            <td><input type="number" class="form-control form-control-sm" value="{{ u[6] or 0 }}" id="token-{{ u[0] }}"></td>
-            <td><input type="number" class="form-control form-control-sm" value="{{ u[7] or 0 }}" id="plays-{{ u[0] }}"></td>
+            <td>{{ u[1] or '无名氏' }}</td>                 <!-- 用户名 -->
+            <td>{{ u[2] if u[2] else '未授权' }}</td>       <!-- 手机号 -->
+            <td><input value="{{ u[3] or 0 }}" ... ></td>   <!-- 积分 -->
+            <td><input value="{{ u[4] or 0 }}" ... ></td>   <!-- Token -->
+            <td><input value="{{ u[5] or 0 }}" ... ></td>   <!-- Plays -->
             <td>{{ u[13] or '无' }}</td>
             <td>{{ '✅' if u[11] else '❌' }}</td>
             <td>
