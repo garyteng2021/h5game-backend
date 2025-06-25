@@ -4,15 +4,24 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify
 from flask_cors import CORS
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 app = Flask(__name__)
+app.config['PROPAGATE_EXCEPTIONS'] = True
+app.config['DEBUG'] = True
 CORS(app)
 
 def get_conn():
-    return psycopg2.connect(DATABASE_URL)
+    try:
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=3)
+        return conn
+    except Exception as e:
+        print('DB CONNECT ERROR:', e, flush=True)
+        raise
 
 def init_db():
     with get_conn() as conn, conn.cursor() as c:
