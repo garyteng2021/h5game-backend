@@ -5,10 +5,10 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN") or "你的BotToken"
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN") or "你的BotToken"
 DATABASE_URL = os.getenv("DATABASE_URL") or "你的Postgres链接"
 
-bot = Bot(token=TELEGRAM_TOKEN, parse_mode=ParseMode.HTML)
+bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
 dp = Dispatcher(bot)
 
 # 全局数据库连接池
