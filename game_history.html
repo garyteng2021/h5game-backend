@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>游戏记录</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+</head>
+<body>
+<div class="container py-4">
+  <h2>游戏记录</h2>
+  <form method="get" action="/game_history" class="mb-3 row g-3">
+    <div class="col-md-4">
+      <input type="text" name="user_id" placeholder="输入用户ID筛选" class="form-control" value="{{ user_id or '' }}">
+    </div>
+    <div class="col-md-2">
+      <button class="btn btn-primary" type="submit">搜索</button>
+    </div>
+  </form>
+
+  <table class="table table-bordered">
+    <thead>
+      <tr>
+        <th>用户ID</th>
+        <th>时间</th>
+        <th>游戏类型</th>
+        <th>关卡</th>
+        <th>得分</th>
+        <th>积分变动</th>
+        <th>Token变动</th>
+        <th>结果</th>
+        <th>备注</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in records %}
+      <tr>
+        <td>{{ r.user_id }}</td>
+        <td>{{ r.created_at }}</td>
+        <td>{{ r.game_type or '-' }}</td>
+        <td>{{ r.level or '-' }}</td>
+        <td>{{ r.user_score }}</td>
+        <td>{{ r.points_change }}</td>
+        <td>{{ r.token_change }}</td>
+        <td>{{ r.result }}</td>
+        <td>{{ r.remark or '-' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="9" class="text-center">暂无记录</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <nav aria-label="分页">
+    <ul class="pagination justify-content-center">
+      <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+        <a href="?user_id={{ user_id }}&page={{ page -1 }}" class="page-link">上一页</a>
+      </li>
+      <li class="page-item disabled"><a class="page-link" href="#">{{ page }} / {{ total_pages }}</a></li>
+      <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+        <a href="?user_id={{ user_id }}&page={{ page +1 }}" class="page-link">下一页</a>
+      </li>
+    </ul>
+  </nav>
+</div>
+</body>
+</html>
