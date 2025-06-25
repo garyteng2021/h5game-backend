@@ -1,6 +1,7 @@
 import os
 import logging
 from dotenv import load_dotenv
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 )
