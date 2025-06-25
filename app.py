@@ -87,7 +87,11 @@ def delete_user():
     cur.close()
     conn.close()
     return "ok"
-
+    
+@app.route("/game/game.html")
+def game_page():
+    return render_template("game.html")
+    
 @app.route("/play", methods=["POST"])
 def play_game():
     user_id = request.form.get("user_id")
