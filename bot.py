@@ -15,7 +15,7 @@ nest_asyncio.apply()
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 API_URL = os.getenv("API_URL")  # 如 "https://your-backend-api.com"
 
 # --- Command: /start ---
