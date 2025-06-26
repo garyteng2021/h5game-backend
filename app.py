@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonifyMore actions
+from flask import Flask, render_template, request, jsonify
 import psycopg2
 import os
 from dotenv import load_dotenv
@@ -87,10 +87,9 @@ def delete_user():
     cur.close()
     conn.close()
     return "ok"
-
-@app.route("/game.html")
+    
+@app.route("/game/game.html")
 def game_page():
-    return render_template("game.html")
     conn = get_conn()
     cur = conn.cursor()
 
@@ -102,7 +101,7 @@ def game_page():
     conn.close()
 
     return render_template("game.html", total_rank=total_rank)
-
+    
 @app.route("/play", methods=["POST"])
 def play_game():
     user_id = request.form.get("user_id")
