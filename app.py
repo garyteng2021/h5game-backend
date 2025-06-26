@@ -88,7 +88,7 @@ def delete_user():
     conn.close()
     return "ok"
 
-@app.route("/game/game.html")
+@app.route("/game.html")
 def game_page():
     return render_template("game.html")
     conn = get_conn()
