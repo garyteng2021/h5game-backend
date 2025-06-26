@@ -61,7 +61,9 @@
         alert("用户信息获取失败！");
         return;
       }
-      $.post('/play', { user_id: userId }, function(data){
+      $.post("https://h5game-backend-production.up.railway.app/play", {
+        user_id: userId
+      }, function(data) {
         refreshData(data);
       }).fail(res => {
         alert(res.responseJSON?.error || '出错了');
