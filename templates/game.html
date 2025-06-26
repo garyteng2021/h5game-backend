@@ -20,6 +20,25 @@
   <button id="playBtn">开始游戏</button>
   <div id="result"></div>
 
+  <!-- 总积分排行榜 -->
+  <h5 class="section-title">🏆 总积分排行榜 (Top 10)</h5>
+  <div class="table-responsive d-flex justify-content-center">
+    <table class="table table-bordered w-auto">
+      <thead class="table-light">
+        <tr><th>名次</th><th>用户名</th><th>积分</th></tr>
+      </thead>
+      <tbody>
+        {% for row in total_rank %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ (row[0][:4] + '***') if row[0] else ((row[1][:4] + '***') if row[1] else '匿名') }}</td>
+          <td>{{ row[2] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
   <script>
     window.Telegram.WebApp.ready();
     const tgUser = Telegram.WebApp.initDataUnsafe.user;
