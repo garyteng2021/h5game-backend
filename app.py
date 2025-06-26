@@ -155,6 +155,19 @@ def play_game():
         "result": "win" if score >= 5 else "lose"
     })
 
+@app.route("/api/rank")
+def api_rank():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT username, phone, points FROM users ORDER BY points DESC LIMIT 10")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return jsonify([
+        {"username": r[0], "phone": r[1], "points": r[2]} for r in rows
+    ])
+
 @app.route("/api/game_history")
 def game_history():
     user_id = request.args.get("user_id")
