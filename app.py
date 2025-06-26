@@ -90,7 +90,17 @@ def delete_user():
     
 @app.route("/game/game.html")
 def game_page():
-    return render_template("game.html")
+    conn = get_conn()
+    cur = conn.cursor()
+
+    # 查询排行榜数据
+    cur.execute("SELECT username, phone, points FROM users ORDER BY points DESC LIMIT 10")
+    total_rank = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return render_template("game.html", total_rank=total_rank)
     
 @app.route("/play", methods=["POST"])
 def play_game():
