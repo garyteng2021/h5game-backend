@@ -108,8 +108,15 @@ def game_page():
 @app.route("/play", methods=["POST"])
 def play_game():
     user_id = request.form.get("user_id")
-    if not user_id:
-        return jsonify({"error": "Missing user_id"}), 400
+    score = request.form.get("score")
+
+    if not user_id or not score:
+        return jsonify({"error": "Missing user_id or score"}), 400
+
+    try:
+        score = int(score)
+    except ValueError:
+        return jsonify({"error": "Invalid score"}), 400
 
     conn = get_conn()
     cur = conn.cursor()
@@ -123,25 +130,24 @@ def play_game():
     if token <= 0:
         return jsonify({"error": "No tokens left"}), 403
 
-    # 模拟游戏
-    import random
-    score = random.randint(1, 10)
-    points += score
-    token -= 1
-    plays += 1
+    # 逻辑处理
+    points_gain = score
+    token_change = -1
+    result = 'win' if score >= 60 else 'lose'  # ⬅️ 你可以自定义判断标准
+    game_type = 'candy_crush'
 
-    # 更新用户积分
+    # 更新用户状态
     cur.execute("""
         UPDATE users 
         SET points=%s, token=%s, plays=%s, last_play=NOW()
         WHERE user_id=%s
-    """, (points, token, plays, user_id))
+    """, (points + points_gain, token + token_change, plays + 1, user_id))
 
-    # 插入历史
+    # 写入历史
     cur.execute("""
         INSERT INTO game_history (user_id, user_score, points_change, token_change, game_type, level, result, remark)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-    """, (user_id, score, score, -1, 'demo', 1, 'win' if score >= 5 else 'lose', '测试H5小游戏'))
+    """, (user_id, score, points_gain, token_change, game_type, 1, result, 'Candy Crush 实际得分'))
 
     conn.commit()
     cur.close()
@@ -149,10 +155,10 @@ def play_game():
 
     return jsonify({
         "score": score,
-        "points": points,
-        "token": token,
-        "plays": plays,
-        "result": "win" if score >= 5 else "lose"
+        "points": points + points_gain,
+        "token": token + token_change,
+        "plays": plays + 1,
+        "result": result
     })
 
 @app.route("/api/rank")
