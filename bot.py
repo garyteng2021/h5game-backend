@@ -11,6 +11,7 @@ from telegram import (
     ReplyKeyboardMarkup,
     InlineKeyboardButton,
     InlineKeyboardMarkup,  # ✅ 英文逗号
+     WebAppInfo,  # ✅ 加在 import 区域
 )
 from telegram.ext import (
     ApplicationBuilder,
@@ -112,9 +113,9 @@ async def show_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def game(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎮 点击开始游戏", callback_game={"game_short_name": "test_game"})]
+        [InlineKeyboardButton("🎮 点击进入游戏", web_app=WebAppInfo(url="https://candycrushmatch3game-production.up.railway.app/"))]
     ])
-    await update.message.reply_game(game_short_name="test_game", reply_markup=keyboard)
+    await update.message.reply_text("点击下方按钮开始游戏：", reply_markup=keyboard)
 
 async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.callback_query.game_short_name == "test_game":
@@ -130,7 +131,6 @@ async def main():
     application.add_handler(CommandHandler("bind", bind))
     application.add_handler(MessageHandler(filters.CONTACT, contact_handler))
     application.add_handler(CommandHandler("rank", show_rank))
-    application.add_handler(CallbackQueryHandler(callback_query_handler))
 
     await application.run_polling()
 
