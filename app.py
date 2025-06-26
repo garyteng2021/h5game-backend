@@ -3,10 +3,12 @@ import psycopg2
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+from flask_cors import CORS
 
 load_dotenv()
 app = Flask(__name__)
 DATABASE_URL = os.getenv("DATABASE_URL")
+CORS(app, origins=["https://candycrushmatch3game-production.up.railway.app"])
 
 def get_conn():
     return psycopg2.connect(DATABASE_URL)
