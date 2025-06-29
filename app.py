@@ -9,7 +9,7 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)  # 允许所有跨域
 DATABASE_URL = os.getenv("DATABASE_URL")
-CORS(app, origins=["https://candycrushmatch3game-production.up.railway.app"])
+CORS(app, origins=["https://candycrushvitebolt-production.up.railway.app/"])
 
 def get_conn():
     return psycopg2.connect(DATABASE_URL)
