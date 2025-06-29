@@ -80,6 +80,15 @@ def update_user():
     conn.close()
     return "ok"
 
+@app.route("/user", methods=["POST"])
+def get_user():
+    user_id = request.form.get("user_id")
+    
+    if not user_id:
+        return jsonify({"error": "Missing user_id"}), 400
+    
+    conn = get_conn
+
 @app.route("/delete_user", methods=["POST"])
 def delete_user():
     user_id = request.form["user_id"]
