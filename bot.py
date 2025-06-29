@@ -113,7 +113,7 @@ async def show_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def game(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎮 点击进入游戏", web_app=WebAppInfo(url="https://candycrushmatch3game-production.up.railway.app/"))]
+        [InlineKeyboardButton("🎮 点击进入游戏", web_app=WebAppInfo(url="https://candycrushvitebolt-production.up.railway.app/"))]
     ])
     await update.message.reply_text("点击下方按钮开始游戏：", reply_markup=keyboard)
         
