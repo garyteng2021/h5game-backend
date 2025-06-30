@@ -7,7 +7,6 @@ from flask_cors import CORS
 
 load_dotenv()
 app = Flask(__name__)
-CORS(app)  # 允许所有跨域
 DATABASE_URL = os.getenv("DATABASE_URL")
 CORS(app, origins=["https://candycrushvitebolt-production.up.railway.app/"])
 
@@ -87,7 +86,32 @@ def get_user():
     if not user_id:
         return jsonify({"error": "Missing user_id"}), 400
     
-    conn = get_conn
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT user_id, username, phone, points, token, plays, created_at, last_play, invite_count, is_blocked, invited_by
+        FROM users WHERE user_id=%s
+    """, (user_id,))
+    user = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if user:
+        return jsonify({
+            "user_id": user[0],
+            "username": user[1],
+            "phone": user[2],
+            "points": user[3],
+            "token": user[4],
+            "plays": user[5],
+            "created_at": user[6].strftime("%Y-%m-%d %H:%M"),
+            "last_play": user[7].strftime("%Y-%m-%d %H:%M") if user[7] else None,
+            "invite_count": user[8],
+            "is_blocked": user[9],
+            "invited_by": user[10]
+        })
+    else:
+        return jsonify({"error": "User not found"}), 404
 
 @app.route("/delete_user", methods=["POST"])
 def delete_user():
