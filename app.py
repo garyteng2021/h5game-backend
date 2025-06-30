@@ -52,6 +52,100 @@ def login():
     conn.close()
     return jsonify(user_data)
 
+# ✅ NEW: API endpoint for getting user profile (matches frontend expectation)
+@app.route("/api/profile", methods=["GET"])
+def api_profile():
+    user_id = request.args.get("user_id")
+    
+    if not user_id:
+        return jsonify({"error": "Missing user_id"}), 400
+    
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT user_id, username, phone, points, token, plays FROM users WHERE user_id=%s", (user_id,))
+    user = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if user:
+        return jsonify({
+            "user_id": user[0],
+            "username": user[1],
+            "phone": user[2],
+            "points": user[3],
+            "token": user[4],
+            "plays": user[5]
+        })
+    else:
+        return jsonify({"error": "User not found"}), 404
+
+# ✅ NEW: API endpoint for reporting game results (matches frontend expectation)
+@app.route("/api/report_game", methods=["POST"])
+def api_report_game():
+    data = request.get_json()
+    user_id = data.get("user_id")
+    user_score = data.get("user_score")
+    points_change = data.get("points_change")
+    token_change = data.get("token_change")
+    game_type = data.get("game_type")
+    level = data.get("level")
+    result = data.get("result")
+    remark = data.get("remark")
+
+    if not user_id or user_score is None:
+        return jsonify({"error": "Missing user_id or user_score"}), 400
+
+    try:
+        user_score = int(user_score)
+        points_change = int(points_change) if points_change is not None else user_score
+        token_change = int(token_change) if token_change is not None else -1
+        level = int(level) if level is not None else 1
+    except ValueError:
+        return jsonify({"error": "Invalid numeric values"}), 400
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    # Get current user data
+    cur.execute("SELECT token, points, plays FROM users WHERE user_id=%s", (user_id,))
+    row = cur.fetchone()
+
+    if not row:
+        return jsonify({"error": "User not found"}), 404
+
+    token, points, plays = row
+    if token <= 0:
+        return jsonify({"error": "No tokens left"}), 403
+
+    # Update user data
+    new_points = points + points_change
+    new_token = token + token_change
+    new_plays = plays + 1
+
+    cur.execute("""
+        UPDATE users 
+        SET points=%s, token=%s, plays=%s, last_play=NOW()
+        WHERE user_id=%s
+    """, (new_points, new_token, new_plays, user_id))
+
+    # Insert game history
+    cur.execute("""
+        INSERT INTO game_history (user_id, user_score, points_change, token_change, game_type, level, result, remark)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+    """, (user_id, user_score, points_change, token_change, game_type or 'candy_crush', level, result or 'completed', remark or 'Game completed'))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return jsonify({
+        "score": user_score,
+        "points": new_points,
+        "token": new_token,
+        "plays": new_plays,
+        "result": result or 'completed'
+    })
+
 @app.route("/admin")
 def admin_dashboard():
     conn = get_conn()
@@ -250,6 +344,7 @@ def submit_score():
         "plays": plays + 1,
         "result": result
     })
+
 @app.route("/api/rank")
 def api_rank():
     conn = get_conn()
