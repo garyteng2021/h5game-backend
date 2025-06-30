@@ -1,17 +1,56 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS
 import psycopg2
 import os
-from dotenv import load_dotenv
 from datetime import datetime
-from flask_cors import CORS
+from dotenv import load_dotenv
 
 load_dotenv()
 app = Flask(__name__)
-DATABASE_URL = os.getenv("DATABASE_URL")
 CORS(app, origins=["https://candycrushvitebolt-production.up.railway.app/"])
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 def get_conn():
     return psycopg2.connect(DATABASE_URL)
+
+# ✅ 登录或注册接口
+@app.route("/login", methods=["POST"])
+def login():
+    data = request.get_json()
+    username = data.get("username")
+    if not username:
+        return jsonify({"error": "Missing username"}), 400
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("SELECT user_id, username, points, token FROM users WHERE username=%s", (username,))
+    user = cur.fetchone()
+
+    if user:
+        user_data = {
+            "id": user[0],
+            "username": user[1],
+            "score": user[2],
+            "token": user[3]
+        }
+    else:
+        cur.execute(
+            "INSERT INTO users (username, points, token, plays) VALUES (%s, 0, 10, 0) RETURNING user_id",
+            (username,)
+        )
+        user_id = cur.fetchone()[0]
+        conn.commit()
+        user_data = {
+            "id": user_id,
+            "username": username,
+            "score": 0,
+            "token": 10
+        }
+
+    cur.close()
+    conn.close()
+    return jsonify(user_data)
 
 @app.route("/admin")
 def admin_dashboard():
@@ -79,6 +118,26 @@ def update_user():
     conn.close()
     return "ok"
 
+# ✅ 获取用户信息
+@app.route("/user/<user_id>", methods=["GET"])
+def get_user_by_id(user_id):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT user_id, username, points, token FROM users WHERE user_id=%s", (user_id,))
+    user = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if user:
+        return jsonify({
+            "id": user[0],
+            "username": user[1],
+            "score": user[2],
+            "token": user[3]
+        })
+    else:
+        return jsonify({"error": "User not found"}), 404
+
 @app.route("/user", methods=["POST"])
 def get_user():
     user_id = request.form.get("user_id")
@@ -138,13 +197,14 @@ def game_page():
 
     return render_template("game.html", total_rank=total_rank)
     
-@app.route("/play", methods=["POST"])
-def play_game():
-    user_id = request.form.get("user_id")
-    score = request.form.get("score")
+@app.route("/score", methods=["POST"])
+def submit_score():
+    data = request.get_json()
+    user_id = data.get("userId")
+    score = data.get("score")
 
-    if not user_id or not score:
-        return jsonify({"error": "Missing user_id or score"}), 400
+    if not user_id or score is None:
+        return jsonify({"error": "Missing userId or score"}), 400
 
     try:
         score = int(score)
@@ -153,9 +213,9 @@ def play_game():
 
     conn = get_conn()
     cur = conn.cursor()
-
     cur.execute("SELECT token, points, plays FROM users WHERE user_id=%s", (user_id,))
     row = cur.fetchone()
+
     if not row:
         return jsonify({"error": "User not found"}), 404
 
@@ -163,20 +223,17 @@ def play_game():
     if token <= 0:
         return jsonify({"error": "No tokens left"}), 403
 
-    # 逻辑处理
-    points_gain = score
     token_change = -1
-    result = 'win' if score >= 60 else 'lose'  # ⬅️ 你可以自定义判断标准
+    points_gain = score
+    result = 'win' if score >= 60 else 'lose'
     game_type = 'candy_crush'
 
-    # 更新用户状态
     cur.execute("""
         UPDATE users 
         SET points=%s, token=%s, plays=%s, last_play=NOW()
         WHERE user_id=%s
     """, (points + points_gain, token + token_change, plays + 1, user_id))
 
-    # 写入历史
     cur.execute("""
         INSERT INTO game_history (user_id, user_score, points_change, token_change, game_type, level, result, remark)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
@@ -193,7 +250,6 @@ def play_game():
         "plays": plays + 1,
         "result": result
     })
-
 @app.route("/api/rank")
 def api_rank():
     conn = get_conn()
