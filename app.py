@@ -90,6 +90,7 @@ def get_user():
     conn = get_conn
 
 @app.route("/api/profile", methods=["GET"])
+POST https://h5game-backend-production.up.railway.app/api/report_game
 def api_profile():
     user_id = request.args.get("user_id")
     
@@ -146,7 +147,75 @@ def game_page():
     conn.close()
 
     return render_template("game.html", total_rank=total_rank)
-    
+
+@app.route("/api/report_game", methods=["POST"])
+def api_report_game():
+    data = request.get_json()
+
+    user_id = data.get("user_id")
+    user_score = data.get("user_score")
+    points_change = data.get("points_change", user_score)
+    token_change = data.get("token_change", -1)
+    game_type = data.get("game_type", "default_game")
+    level = data.get("level", 1)
+    result = data.get("result", "unknown")
+    remark = data.get("remark", "Game report")
+
+    if not user_id or user_score is None:
+        return jsonify({"error": "Missing user_id or user_score"}), 400
+
+    try:
+        user_score = int(user_score)
+        points_change = int(points_change)
+        token_change = int(token_change)
+        level = int(level)
+    except ValueError:
+        return jsonify({"error": "Invalid numeric values"}), 400
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    # 获取当前用户数据
+    cur.execute("SELECT token, points, plays FROM users WHERE user_id=%s", (user_id,))
+    row = cur.fetchone()
+    if not row:
+        return jsonify({"error": "User not found"}), 404
+
+    token, points, plays = row
+    if token + token_change < 0:
+        return jsonify({"error": "Insufficient tokens"}), 403
+
+    # 更新用户状态
+    cur.execute("""
+        UPDATE users 
+        SET points = points + %s, token = token + %s, plays = plays + 1, last_play = NOW()
+        WHERE user_id = %s
+    """, (points_change, token_change, user_id))
+
+    # 插入游戏记录
+    cur.execute("""
+        INSERT INTO game_history (
+            user_id, user_score, points_change, token_change, 
+            game_type, level, result, remark
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+    """, (
+        user_id, user_score, points_change, token_change,
+        game_type, level, result, remark
+    ))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return jsonify({
+        "score": user_score,
+        "points": points + points_change,
+        "token": token + token_change,
+        "plays": plays + 1,
+        "result": result
+    })
+
+
 @app.route("/play", methods=["POST"])
 def play_game():
     user_id = request.form.get("user_id")
