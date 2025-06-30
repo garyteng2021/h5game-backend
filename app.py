@@ -90,7 +90,6 @@ def get_user():
     conn = get_conn
 
 @app.route("/api/profile", methods=["GET"])
-POST https://h5game-backend-production.up.railway.app/api/report_game
 def api_profile():
     user_id = request.args.get("user_id")
     
