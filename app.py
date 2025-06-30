@@ -114,7 +114,7 @@ def api_profile():
             VALUES (%s, %s, 0, 10, 0)
         """, (user_id, username))
         conn.commit()
-        user = (user_id, username, None, 0, 10, 0)
+        user = (str(user_id), username, None, 0, 10, 0)
 
     cur.close()
     conn.close()
