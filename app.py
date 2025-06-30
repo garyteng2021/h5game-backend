@@ -1,150 +1,18 @@
-from flask import Flask, request, jsonify, render_template
-from flask_cors import CORS
+from flask import Flask, render_template, request, jsonify
 import psycopg2
 import os
-from datetime import datetime
 from dotenv import load_dotenv
+from datetime import datetime
+from flask_cors import CORS
 
 load_dotenv()
 app = Flask(__name__)
-CORS(app, origins=["https://candycrushvitebolt-production.up.railway.app/"])
+CORS(app)  # 允许所有跨域
 DATABASE_URL = os.getenv("DATABASE_URL")
+CORS(app, origins=["https://candycrushvitebolt-production.up.railway.app/"])
 
 def get_conn():
     return psycopg2.connect(DATABASE_URL)
-
-# ✅ 登录或注册接口
-@app.route("/login", methods=["POST"])
-def login():
-    data = request.get_json()
-    username = data.get("username")
-    if not username:
-        return jsonify({"error": "Missing username"}), 400
-
-    conn = get_conn()
-    cur = conn.cursor()
-
-    cur.execute("SELECT user_id, username, points, token FROM users WHERE username=%s", (username,))
-    user = cur.fetchone()
-
-    if user:
-        user_data = {
-            "id": user[0],
-            "username": user[1],
-            "score": user[2],
-            "token": user[3]
-        }
-    else:
-        cur.execute(
-            "INSERT INTO users (username, points, token, plays) VALUES (%s, 0, 10, 0) RETURNING user_id",
-            (username,)
-        )
-        user_id = cur.fetchone()[0]
-        conn.commit()
-        user_data = {
-            "id": user_id,
-            "username": username,
-            "score": 0,
-            "token": 10
-        }
-
-    cur.close()
-    conn.close()
-    return jsonify(user_data)
-
-# ✅ NEW: API endpoint for getting user profile (matches frontend expectation)
-@app.route("/api/profile", methods=["GET"])
-def api_profile():
-    user_id = request.args.get("user_id")
-    
-    if not user_id:
-        return jsonify({"error": "Missing user_id"}), 400
-    
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT user_id, username, phone, points, token, plays FROM users WHERE user_id=%s", (user_id,))
-    user = cur.fetchone()
-    cur.close()
-    conn.close()
-
-    if user:
-        return jsonify({
-            "user_id": user[0],
-            "username": user[1],
-            "phone": user[2],
-            "points": user[3],
-            "token": user[4],
-            "plays": user[5]
-        })
-    else:
-        return jsonify({"error": "User not found"}), 404
-
-# ✅ NEW: API endpoint for reporting game results (matches frontend expectation)
-@app.route("/api/report_game", methods=["POST"])
-def api_report_game():
-    data = request.get_json()
-    user_id = data.get("user_id")
-    user_score = data.get("user_score")
-    points_change = data.get("points_change")
-    token_change = data.get("token_change")
-    game_type = data.get("game_type")
-    level = data.get("level")
-    result = data.get("result")
-    remark = data.get("remark")
-
-    if not user_id or user_score is None:
-        return jsonify({"error": "Missing user_id or user_score"}), 400
-
-    try:
-        user_score = int(user_score)
-        points_change = int(points_change) if points_change is not None else user_score
-        token_change = int(token_change) if token_change is not None else -1
-        level = int(level) if level is not None else 1
-    except ValueError:
-        return jsonify({"error": "Invalid numeric values"}), 400
-
-    conn = get_conn()
-    cur = conn.cursor()
-
-    # Get current user data
-    cur.execute("SELECT token, points, plays FROM users WHERE user_id=%s", (user_id,))
-    row = cur.fetchone()
-
-    if not row:
-        return jsonify({"error": "User not found"}), 404
-
-    token, points, plays = row
-    if token <= 0:
-        return jsonify({"error": "No tokens left"}), 403
-
-    # Update user data
-    new_points = points + points_change
-    new_token = token + token_change
-    new_plays = plays + 1
-
-    cur.execute("""
-        UPDATE users 
-        SET points=%s, token=%s, plays=%s, last_play=NOW()
-        WHERE user_id=%s
-    """, (new_points, new_token, new_plays, user_id))
-
-    # Insert game history
-    cur.execute("""
-        INSERT INTO game_history (user_id, user_score, points_change, token_change, game_type, level, result, remark)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-    """, (user_id, user_score, points_change, token_change, game_type or 'candy_crush', level, result or 'completed', remark or 'Game completed'))
-
-    conn.commit()
-    cur.close()
-    conn.close()
-
-    return jsonify({
-        "score": user_score,
-        "points": new_points,
-        "token": new_token,
-        "plays": new_plays,
-        "result": result or 'completed'
-    })
 
 @app.route("/admin")
 def admin_dashboard():
@@ -212,26 +80,6 @@ def update_user():
     conn.close()
     return "ok"
 
-# ✅ 获取用户信息
-@app.route("/user/<user_id>", methods=["GET"])
-def get_user_by_id(user_id):
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT user_id, username, points, token FROM users WHERE user_id=%s", (user_id,))
-    user = cur.fetchone()
-    cur.close()
-    conn.close()
-
-    if user:
-        return jsonify({
-            "id": user[0],
-            "username": user[1],
-            "score": user[2],
-            "token": user[3]
-        })
-    else:
-        return jsonify({"error": "User not found"}), 404
-
 @app.route("/user", methods=["POST"])
 def get_user():
     user_id = request.form.get("user_id")
@@ -239,32 +87,7 @@ def get_user():
     if not user_id:
         return jsonify({"error": "Missing user_id"}), 400
     
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT user_id, username, phone, points, token, plays, created_at, last_play, invite_count, is_blocked, invited_by
-        FROM users WHERE user_id=%s
-    """, (user_id,))
-    user = cur.fetchone()
-    cur.close()
-    conn.close()
-
-    if user:
-        return jsonify({
-            "user_id": user[0],
-            "username": user[1],
-            "phone": user[2],
-            "points": user[3],
-            "token": user[4],
-            "plays": user[5],
-            "created_at": user[6].strftime("%Y-%m-%d %H:%M"),
-            "last_play": user[7].strftime("%Y-%m-%d %H:%M") if user[7] else None,
-            "invite_count": user[8],
-            "is_blocked": user[9],
-            "invited_by": user[10]
-        })
-    else:
-        return jsonify({"error": "User not found"}), 404
+    conn = get_conn
 
 @app.route("/delete_user", methods=["POST"])
 def delete_user():
@@ -291,14 +114,13 @@ def game_page():
 
     return render_template("game.html", total_rank=total_rank)
     
-@app.route("/score", methods=["POST"])
-def submit_score():
-    data = request.get_json()
-    user_id = data.get("userId")
-    score = data.get("score")
+@app.route("/play", methods=["POST"])
+def play_game():
+    user_id = request.form.get("user_id")
+    score = request.form.get("score")
 
-    if not user_id or score is None:
-        return jsonify({"error": "Missing userId or score"}), 400
+    if not user_id or not score:
+        return jsonify({"error": "Missing user_id or score"}), 400
 
     try:
         score = int(score)
@@ -307,9 +129,9 @@ def submit_score():
 
     conn = get_conn()
     cur = conn.cursor()
+
     cur.execute("SELECT token, points, plays FROM users WHERE user_id=%s", (user_id,))
     row = cur.fetchone()
-
     if not row:
         return jsonify({"error": "User not found"}), 404
 
@@ -317,17 +139,20 @@ def submit_score():
     if token <= 0:
         return jsonify({"error": "No tokens left"}), 403
 
-    token_change = -1
+    # 逻辑处理
     points_gain = score
-    result = 'win' if score >= 60 else 'lose'
+    token_change = -1
+    result = 'win' if score >= 60 else 'lose'  # ⬅️ 你可以自定义判断标准
     game_type = 'candy_crush'
 
+    # 更新用户状态
     cur.execute("""
         UPDATE users 
         SET points=%s, token=%s, plays=%s, last_play=NOW()
         WHERE user_id=%s
     """, (points + points_gain, token + token_change, plays + 1, user_id))
 
+    # 写入历史
     cur.execute("""
         INSERT INTO game_history (user_id, user_score, points_change, token_change, game_type, level, result, remark)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
