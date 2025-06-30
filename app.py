@@ -92,20 +92,27 @@ def get_user():
 @app.route("/api/profile", methods=["GET"])
 def api_profile():
     user_id = request.args.get("user_id")
-    
+
     if not user_id:
         return jsonify({"error": "Missing user_id"}), 400
 
+    user_id = str(user_id)  # 强制字符串类型
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("SELECT token, points, plays FROM users WHERE user_id::text = %s", (str(user_id),))
+    cur.execute("""
+        SELECT user_id, username, phone, points, token, plays 
+        FROM users WHERE user_id::text = %s
+    """, (user_id,))
     user = cur.fetchone()
 
     if not user:
-        # 自动注册匿名用户（不推荐生产用）
+        # 自动注册匿名用户（不建议生产用）
         username = f"user_{user_id[-4:]}"
-        cur.execute("INSERT INTO users (user_id, username, points, token, plays) VALUES (%s, %s, 0, 10, 0)", (user_id, username))
+        cur.execute("""
+            INSERT INTO users (user_id, username, points, token, plays) 
+            VALUES (%s, %s, 0, 10, 0)
+        """, (user_id, username))
         conn.commit()
         user = (user_id, username, None, 0, 10, 0)
 
@@ -120,7 +127,6 @@ def api_profile():
         "token": user[4],
         "plays": user[5]
     })
-
 
 @app.route("/delete_user", methods=["POST"])
 def delete_user():
