@@ -99,7 +99,7 @@ def api_profile():
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("SELECT user_id, username, phone, points, token, plays FROM users WHERE user_id=%s", (user_id,))
+    cur.execute("SELECT token, points, plays FROM users WHERE user_id::text = %s", (str(user_id),))
     user = cur.fetchone()
 
     if not user:
