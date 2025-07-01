@@ -214,7 +214,7 @@ def api_rank():
     ])
 
 @app.route("/api/game_history")
-def game_history():
+def get_game_history():
     user_id = request.args.get("user_id")
     page = int(request.args.get("page", 1))
     per_page = 10
