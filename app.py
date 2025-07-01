@@ -7,10 +7,11 @@ from flask_cors import CORS
 
 load_dotenv()
 app = Flask(__name__)
-CORS(app)  # 允许所有跨域
-DATABASE_URL = os.getenv("DATABASE_URL")
-CORS(app, origins=["https://candycrushvitebolt-production.up.railway.app/"])
 
+# ✅ 只保留这一行（限制允许跨域的前端地址）
+CORS(app, origins=["https://candycrushvitebolt-production.up.railway.app"])
+
+DATABASE_URL = os.getenv("DATABASE_URL")
 def get_conn():
     return psycopg2.connect(DATABASE_URL)
 
