@@ -213,6 +213,47 @@ def api_rank():
     return jsonify([
         {"username": r[0], "phone": r[1], "points": r[2]} for r in rows
     ])
+    
+@app.route("/api/report_game", methods=["POST"])
+def report_game():
+    try:
+        data = request.get_json()
+        user_id = str(data.get("user_id"))
+        user_score = int(data.get("user_score", 0))
+        points_change = int(data.get("points_change", 0))
+        token_change = int(data.get("token_change", 0))
+        game_type = data.get("game_type", "candy_crush")
+        level = int(data.get("level", 1))
+        result = data.get("result", "win")
+        remark = data.get("remark", "")
+
+        if not user_id:
+            return jsonify({"error": "Missing user_id"}), 400
+
+        conn = get_conn()
+        cur = conn.cursor()
+
+        # 写入 game_history
+        cur.execute("""
+            INSERT INTO game_history (user_id, game_type, level, user_score, points_change, token_change, result, remark)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (user_id, game_type, level, user_score, points_change, token_change, result, remark))
+
+        # 同步更新用户积分、token、plays、last_play
+        cur.execute("""
+            UPDATE users 
+            SET points = points + %s, token = token + %s, plays = plays + 1, last_play = NOW()
+            WHERE user_id::text = %s
+        """, (points_change, token_change, user_id))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify({"success": True})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/game_history")
 def get_game_history():
