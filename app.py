@@ -1,17 +1,18 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask import Flask, render_template, request, jsonify
+import psycopg2
 import os
 from dotenv import load_dotenv
+from datetime import datetime
+from flask_cors import CORS
 
 load_dotenv()
 app = Flask(__name__)
 
-# ✅ CORS 设置，允许跨域访问并处理预检请求
-CORS(app, resources={r"/api/*": {"origins": [
-    "https://candycrushvitebolt-production.up.railway.app"
-]}}, supports_credentials=True, methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type"])
+# ✅ 只保留这一行（限制允许跨域的前端地址）
+CORS(app, origins=["https://candycrushvitebolt-production.up.railway.app"])
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+
 def get_conn():
     return psycopg2.connect(DATABASE_URL)
 
