@@ -153,71 +153,51 @@ def game_page():
 
     return render_template("game.html", total_rank=total_rank)
 
-@app.route("/api/report_game", methods=["POST"])
-def api_report_game():
-    data = request.get_json()
+@app.route("/api/game_history")
+def game_history():
+    user_id = request.args.get("user_id")
+    page = int(request.args.get("page", 1))
+    per_page = 10
+    offset = (page - 1) * per_page
 
-    user_id = data.get("user_id")
-    user_score = data.get("user_score")
-    points_change = data.get("points_change", user_score)
-    token_change = data.get("token_change", -1)
-    game_type = data.get("game_type", "default_game")
-    level = data.get("level", 1)
-    result = data.get("result", "unknown")
-    remark = data.get("remark", "Game report")
-
-    if not user_id or user_score is None:
-        return jsonify({"error": "Missing user_id or user_score"}), 400
-
-    try:
-        user_score = int(user_score)
-        points_change = int(points_change)
-        token_change = int(token_change)
-        level = int(level)
-    except ValueError:
-        return jsonify({"error": "Invalid numeric values"}), 400
+    if not user_id:
+        return jsonify({"error": "Missing user_id"}), 400
 
     conn = get_conn()
     cur = conn.cursor()
 
-    # 获取当前用户数据
-    cur.execute("SELECT token, points, plays FROM users WHERE user_id=%s", (user_id,))
-    row = cur.fetchone()
-    if not row:
-        return jsonify({"error": "User not found"}), 404
+    # 强制 string 对比
+    cur.execute("SELECT COUNT(*) FROM game_history WHERE user_id::text = %s", (str(user_id),))
+    total = cur.fetchone()[0]
 
-    token, points, plays = row
-    if token + token_change < 0:
-        return jsonify({"error": "Insufficient tokens"}), 403
-
-    # 更新用户状态
     cur.execute("""
-        UPDATE users 
-        SET points = points + %s, token = token + %s, plays = plays + 1, last_play = NOW()
-        WHERE user_id = %s
-    """, (points_change, token_change, user_id))
+        SELECT created_at, game_type, level, user_score, points_change, token_change, result, remark
+        FROM game_history 
+        WHERE user_id::text = %s
+        ORDER BY created_at DESC
+        LIMIT %s OFFSET %s
+    """, (str(user_id), per_page, offset))
+    rows = cur.fetchall()
 
-    # 插入游戏记录
-    cur.execute("""
-        INSERT INTO game_history (
-            user_id, user_score, points_change, token_change, 
-            game_type, level, result, remark
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-    """, (
-        user_id, user_score, points_change, token_change,
-        game_type, level, result, remark
-    ))
-
-    conn.commit()
     cur.close()
     conn.close()
 
     return jsonify({
-        "score": user_score,
-        "points": points + points_change,
-        "token": token + token_change,
-        "plays": plays + 1,
-        "result": result
+        "total": total,
+        "per_page": per_page,
+        "records": [
+            {
+                "created_at": r[0].strftime('%Y-%m-%d %H:%M') if r[0] else "",
+                "game_type": r[1],
+                "level": r[2],
+                "user_score": r[3],
+                "points_change": r[4],
+                "token_change": r[5],
+                "result": r[6],
+                "remark": r[7]
+            }
+            for r in rows
+        ]
     })
 
 @app.route("/api/rank")
