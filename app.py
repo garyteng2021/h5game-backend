@@ -234,13 +234,23 @@ def report_game():
         conn = get_conn()
         cur = conn.cursor()
 
-        # 写入 game_history
+        # ✅ 查询当前 token
+        cur.execute("SELECT token FROM users WHERE user_id::text = %s", (user_id,))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "User not found"}), 404
+
+        current_token = row[0]
+        if current_token < abs(token_change):  # 如果 token 不足（比如要减1，但剩下 0）
+            return jsonify({"error": "Not enough tokens"}), 400
+
+        # ✅ 写入 game_history
         cur.execute("""
             INSERT INTO game_history (user_id, game_type, level, user_score, points_change, token_change, result, remark)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """, (user_id, game_type, level, user_score, points_change, token_change, result, remark))
 
-        # 同步更新用户积分、token、plays、last_play
+        # ✅ 更新用户数据
         cur.execute("""
             UPDATE users 
             SET points = points + %s, token = token + %s, plays = plays + 1, last_play = NOW()
